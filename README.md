@@ -1,9 +1,5 @@
 # 🚀 **AI SaaS Platform** — *Powered by PERN & AI APIs*  
-
-[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Click%20Here-brightgreen?style=for-the-badge)](https://quickai-gs.vercel.app/)  
-[![PERN](https://img.shields.io/badge/Stack-PERN-1DB954?style=for-the-badge&logo=postgresql&logoColor=white)](https://quickai-gs.vercel.app/)  
-[![TailwindCSS](https://img.shields.io/badge/Styled_with-TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)]()  
-[![AI-Powered](https://img.shields.io/badge/⚡AI%20Features-Enabled-blueviolet?style=for-the-badge)]()  
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-QuickAI-blue?style=for-the-badge&logo=vercel)](https://quickai-gs.vercel.app/)
 
 ---
 
@@ -29,13 +25,13 @@ We’ve built a **fully functional AI SaaS application** using the **PERN stack*
 
 ---
 
-## 🌐 **Live Deployment**
-> 🎉 **Check out the live app here:**  
-🔗 **[https://quickai-gs.vercel.app/](https://quickai-gs.vercel.app/)**  
+## 🛠️ **Tech Stack**
+| Frontend   | Backend   | Database   | Authentication | Styling | Live Demo |
+|-----------|-----------|------------|----------------|---------|-----------|
+| ⚛️ React | 🟢 Node.js | 🐘 PostgreSQL | 🔑 Clerk | 🎨 TailwindCSS | 🌐 [Live Demo](https://quickai-gs.vercel.app/) |
 
 ---
 
-## 🛠️ **Tech Stack**
-| Frontend   | Backend   | Database   | Authentication | Styling |
-|-----------|-----------|------------|----------------|---------|
-| ⚛️ React | 🟢 Node.js | 🐘 PostgreSQL | 🔑 Clerk | 🎨 TailwindCSS |
+## 🌐 **Live Deployment**
+> 🎉 **Check out the live app here:**  
+🔗 **[https://quickai-gs.vercel.app/](https://quickai-gs.vercel.app/)**  
