@@ -1,4 +1,4 @@
-# 🚀 **AI SaaS Platform** — *Powered by PERN & AI APIs*  
+# 🚀 **AI SaaS Platform** — *Powered by PERN, NeoN Database & AI APIs*  
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-QuickAI-blue?style=for-the-badge&logo=vercel)](https://quickai-gs.vercel.app/)
 
 ---
