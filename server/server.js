@@ -13,7 +13,8 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-await connectCloudinary();
+// Initialize Cloudinary connection
+connectCloudinary().catch(console.error);
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
@@ -21,7 +22,7 @@ app.use(cors({
 app.use(clerkMiddleware());
 
 app.get('/', (req, res) => {
-  res.send("Server is in home page broh:");
+  res.send("Server is live");
 });
 
 // Test endpoint to verify server is working
@@ -176,33 +177,39 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-console.log('🚀 Starting server...');
-console.log('🔧 Environment:', process.env.NODE_ENV || 'development');
-console.log('🌐 Port:', PORT);
-console.log('🔑 API Base URL:', process.env.CLIENT_URL || 'http://localhost:5173');
+// Start server only in development mode
+if (process.env.NODE_ENV !== 'production') {
+  console.log('🚀 Starting server...');
+  console.log('🔧 Environment:', process.env.NODE_ENV || 'development');
+  console.log('🌐 Port:', PORT);
+  console.log('🔑 API Base URL:', process.env.CLIENT_URL || 'http://localhost:5173');
 
-app.listen(PORT, () => {
-  console.log(`✅ Server is running at http://localhost:${PORT}`);
-  console.log(`📁 AI routes mounted at /api/ai`);
-  console.log(`👤 User routes mounted at /api/user`);
-  console.log(`🔐 Authentication required for /api/ai routes`);
-  console.log('🎯 Ready to handle requests!');
-  
-  // Log routes after server is fully initialized
-  setTimeout(() => {
-    console.log('🔍 Logging routes after server initialization...');
-    try {
-      if (app._router && app._router.stack) {
-        app._router.stack.forEach((middleware) => {
-          if (middleware.route) {
-            console.log(`📍 Route: ${middleware.route.stack[0].method.toUpperCase()} ${middleware.route.path}`);
-          } else if (middleware.name === 'router') {
-            console.log(`📍 Router: ${middleware.regexp}`);
-          }
-        });
+  app.listen(PORT, () => {
+    console.log(`✅ Server is running at http://localhost:${PORT}`);
+    console.log(`📁 AI routes mounted at /api/ai`);
+    console.log(`👤 User routes mounted at /api/user`);
+    console.log(`🔐 Authentication required for /api/ai routes`);
+    console.log('🎯 Ready to handle requests!');
+    
+    // Log routes after server is fully initialized
+    setTimeout(() => {
+      console.log('🔍 Logging routes after server initialization...');
+      try {
+        if (app._router && app._router.stack) {
+          app._router.stack.forEach((middleware) => {
+            if (middleware.route) {
+              console.log(`📍 Route: ${middleware.route.stack[0].method.toUpperCase()} ${middleware.route.path}`);
+            } else if (middleware.name === 'router') {
+              console.log(`📍 Router: ${middleware.regexp}`);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error logging routes after initialization:', error.message);
       }
-    } catch (error) {
-      console.error('❌ Error logging routes after initialization:', error.message);
-    }
-  }, 1000);
-});
+    }, 1000);
+  });
+}
+
+// Export the app for Vercel serverless deployment
+export default app;

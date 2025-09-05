@@ -292,12 +292,27 @@ export const RemoveImageBackground= async (req, res) => {
 
 export const removeImageObject= async (req, res) => {
   try {
+    console.log('removeImageObject called with:', { 
+      body: req.body, 
+      file: req.file,
+      headers: req.headers
+    });
+    
     const userId = (typeof req.auth === 'function' && req.auth()) ? (req.auth().userId || 'test-user-123') : 'test-user-123';
     const image = req.file;
     const { object } = req.body;
+    
     if (!image) {
+      console.log('No image file uploaded');
       return res.status(400).json({ success: false, message: 'No image uploaded' });
     }
+    
+    if (!object || !object.trim()) {
+      console.log('No object specified for removal');
+      return res.status(400).json({ success: false, message: 'Object name is required' });
+    }
+    
+    console.log('Processing object removal:', { object: object.trim(), imageSize: image.size });
 
 
     const plan = req.plan || 'free'; // fallback
@@ -313,8 +328,8 @@ export const removeImageObject= async (req, res) => {
           filename: image.originalname || 'image.png',
           contentType: image.mimetype || 'image/png'
         });
-        if (object) {
-          form.append('prompt', String(object));
+        if (object && object.trim()) {
+          form.append('prompt', String(object.trim()));
         }
 
         const clipResp = await axios.post(
