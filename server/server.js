@@ -1,83 +1,146 @@
+// server.js
 import express from 'express';
 import cors from 'cors';
-import { clerkMiddleware, requireAuth } from '@clerk/express';
+import { clerkMiddleware /*, requireAuth*/ } from '@clerk/express';
 import 'dotenv/config';
 import aiRouter from './routes/aiRoutes.js';
-import connectCloudinary from './configs/cloudinary.js'
+import connectCloudinary from './configs/cloudinary.js';
 import userRouter from './routes/userRoutes.js';
 import multer from 'multer';
+import serverless from 'serverless-http';
 
 const app = express();
 
-// Increase payload size limit for file uploads
+/**
+ * Middleware and payload limits
+ */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-await connectCloudinary();
+/**
+ * CORS
+ */
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
-app.use(clerkMiddleware());
 
-app.get('/', (req, res) => {
-  res.send("Server is in home page broh:");
-});
+/**
+ * Clerk middleware
+ */
+try {
+  app.use(clerkMiddleware());
+} catch (err) {
+  // If Clerk init fails at runtime, log and continue — Clerk might require env vars set in Vercel.
+  console.warn('⚠️ Clerk middleware setup failed:', err && err.message ? err.message : err);
+}
 
-// Test endpoint to verify server is working
-app.get('/api/test', async (req, res) => {
+/**
+ * Safe async initialization (Cloudinary etc.)
+ * We perform initialization once and await it before handling requests.
+ */
+let initError = null;
+const initPromise = (async () => {
   try {
-    await initializeCloudinary();
-    res.json({ 
-      success: true, 
-      message: 'Server is working!', 
-      timestamp: new Date().toISOString(),
-      routes: ['/api/ai/*', '/api/user/*'],
-      status: 'healthy'
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server initialization failed' });
+    if (typeof connectCloudinary === 'function') {
+      await connectCloudinary();
+      console.log('✅ Cloudinary connected (or connect function executed).');
+    } else {
+      console.warn('⚠️ connectCloudinary is not a function — skipping Cloudinary init.');
+    }
+  } catch (err) {
+    initError = err;
+    console.error('❌ Error during initialization:', err);
+    // don't throw here so serverless still starts; we'll surface errors in /api/health or root if desired
   }
+})();
+
+/**
+ * Root route and health/test endpoints
+ */
+app.get('/', (req, res) => {
+  // Surface init error if present to help debugging on Vercel
+  if (initError) {
+    return res.status(500).send(`Server initialization error: ${initError.message || String(initError)}`);
+  }
+  res.send('Server is live 🚀');
 });
 
-// Simple health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
+app.get('/api/test', async (req, res) => {
+  // Ensure init done
+  await initPromise;
+  if (initError) {
+    return res.status(500).json({
+      success: false,
+      message: 'Server initialization failed',
+      error: initError.message || String(initError)
+    });
+  }
+  res.json({
+    success: true,
+    message: 'Server is working!',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    server: 'venAI Server'
+    routes: ['/api/ai/*', '/api/user/*'],
+    status: 'healthy'
   });
 });
 
-// Only protect /api/ai with authentication
-console.log('🔐 Setting up authentication middleware');
-// Temporarily comment out authentication for testing
+app.get('/api/health', async (req, res) => {
+  await initPromise;
+  res.json({
+    status: initError ? 'degraded' : 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    server: 'venAI Server',
+    initError: initError ? (initError.message || String(initError)) : undefined
+  });
+});
+
+/**
+ * Optional: temporarily disabled auth for easier testing on Vercel
+ * Uncomment to protect /api/ai with Clerk auth:
+ */
 // app.use(requireAuth());
 
-// Add logging middleware for debugging
+/**
+ * Logging middleware for /api/ai
+ */
 app.use('/api/ai', (req, res, next) => {
-  console.log(`🔍 ${req.method} ${req.path}`, { 
-    body: req.body, 
+  console.log(`🔍 ${req.method} ${req.path}`, {
+    body: req.body,
     files: req.files,
-    headers: req.headers,
+    headers: {
+      'content-type': req.headers['content-type'],
+      // do not log authentication secrets — only show presence
+      auth: req.headers.authorization ? '[REDACTED]' : undefined
+    },
     url: req.url,
     originalUrl: req.originalUrl
   });
   next();
 });
 
-// Add general API logging
+/**
+ * General API logging
+ */
 app.use('/api', (req, res, next) => {
   console.log(`🌐 API Request: ${req.method} ${req.originalUrl}`);
   next();
 });
 
+/**
+ * Mount routers (keep existing behavior)
+ */
 console.log('🔧 Mounting AI routes at /api/ai');
-app.use('/api/ai',aiRouter);
+app.use('/api/ai', aiRouter);
 
-// Add route verification
+console.log('🔧 Mounting User routes at /api/user');
+app.use('/api/user', userRouter);
+
+/**
+ * /api/routes for debugging registered routes (keeps your previous implementation)
+ */
 app.get('/api/routes', (req, res) => {
   try {
     const routes = [];
@@ -89,22 +152,21 @@ app.get('/api/routes', (req, res) => {
           routes.push(`Router: ${middleware.regexp}`);
         }
       });
-      
-      // Check specific routes
-      const hasAIRoutes = app._router.stack.some(middleware => 
-        middleware.name === 'router' && middleware.regexp.toString().includes('/api/ai')
+
+      const hasAIRoutes = app._router.stack.some(middleware =>
+        middleware.name === 'router' && middleware.regexp && middleware.regexp.toString().includes('/api/ai')
       );
-      
-      res.json({ 
-        routes, 
+
+      res.json({
+        routes,
         count: routes.length,
         hasAIRoutes,
         timestamp: new Date().toISOString(),
         server: 'venAI Server'
       });
     } else {
-      res.json({ 
-        routes: [], 
+      res.json({
+        routes: [],
         count: 0,
         hasAIRoutes: false,
         timestamp: new Date().toISOString(),
@@ -114,7 +176,7 @@ app.get('/api/routes', (req, res) => {
     }
   } catch (error) {
     console.error('Error in /api/routes:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to get routes',
       message: error.message,
       timestamp: new Date().toISOString()
@@ -122,12 +184,14 @@ app.get('/api/routes', (req, res) => {
   }
 });
 
-// Simple routes check
+/**
+ * Simple routes check (keeps your list)
+ */
 app.get('/api/routes-simple', (req, res) => {
-  res.json({ 
+  res.json({
     availableEndpoints: [
       'GET /api/test',
-      'GET /api/health', 
+      'GET /api/health',
       'GET /api/routes',
       'POST /api/ai/resume-review',
       'POST /api/ai/generate-article',
@@ -142,31 +206,12 @@ app.get('/api/routes-simple', (req, res) => {
   });
 });
 
-console.log('🔧 Mounting User routes at /api/user');
-app.use('/api/user', userRouter);
-
-// Log all registered routes for debugging
-console.log('🔍 Logging all registered routes...');
-try {
-  if (app._router && app._router.stack) {
-    app._router.stack.forEach((middleware) => {
-      if (middleware.route) {
-        console.log(`📍 Route: ${middleware.route.stack[0].method.toUpperCase()} ${middleware.route.path}`);
-      } else if (middleware.name === 'router') {
-        console.log(`📍 Router: ${middleware.regexp}`);
-      }
-    });
-  } else {
-    console.log('⚠️ Router not yet initialized, skipping route logging');
-  }
-} catch (error) {
-  console.error('❌ Error logging routes:', error.message);
-}
-
-// Error handling middleware
+/**
+ * Global error handling (keeps your behavior)
+ */
 app.use((error, req, res, next) => {
   console.error('Global error handler:', error);
-  
+
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ success: false, message: 'File too large. Maximum size is 5MB.' });
@@ -175,39 +220,23 @@ app.use((error, req, res, next) => {
       return res.status(400).json({ success: false, message: 'Too many files uploaded.' });
     }
   }
-  
+
   res.status(500).json({ success: false, message: error.message || 'Internal server error' });
 });
 
-const PORT = process.env.PORT || 3000;
+/**
+ * Export serverless handler for Vercel
+ *
+ * serverless-http wraps the express app for serverless platforms.
+ * We ensure initialization promise resolved before delegating to handler.
+ */
+const wrappedHandler = serverless(app);
 
-console.log('🚀 Starting server...');
-console.log('🔧 Environment:', process.env.NODE_ENV || 'development');
-console.log('🌐 Port:', PORT);
-console.log('🔑 API Base URL:', process.env.CLIENT_URL || 'http://localhost:5173');
+export default async function handler(req, res) {
+  // ensure async init finished so routes relying on Cloudinary etc. are ready
+  await initPromise;
 
-app.listen(PORT, () => {
-  console.log(`✅ Server is running at http://localhost:${PORT}`);
-  console.log(`📁 AI routes mounted at /api/ai`);
-  console.log(`👤 User routes mounted at /api/user`);
-  console.log(`🔐 Authentication required for /api/ai routes`);
-  console.log('🎯 Ready to handle requests!');
-  
-  // Log routes after server is fully initialized
-  setTimeout(() => {
-    console.log('🔍 Logging routes after server initialization...');
-    try {
-      if (app._router && app._router.stack) {
-        app._router.stack.forEach((middleware) => {
-          if (middleware.route) {
-            console.log(`📍 Route: ${middleware.route.stack[0].method.toUpperCase()} ${middleware.route.path}`);
-          } else if (middleware.name === 'router') {
-            console.log(`📍 Router: ${middleware.regexp}`);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error logging routes after initialization:', error.message);
-    }
-  }, 1000);
-});
+  // If initialization yielded an error, we still forward the request
+  // but you may prefer returning 500 for all requests; currently root/health endpoints surface the error.
+  return wrappedHandler(req, res);
+}
