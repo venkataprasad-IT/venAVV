@@ -13,26 +13,44 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-await connectCloudinary();
+// Initialize Cloudinary connection (remove top-level await)
+let cloudinaryInitialized = false;
+const initializeCloudinary = async () => {
+  if (!cloudinaryInitialized) {
+    await connectCloudinary();
+    cloudinaryInitialized = true;
+  }
+};
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
 app.use(clerkMiddleware());
 
-app.get('/', (req, res) => {
-  res.send("Server is in home page broh:");
+app.get('/', async (req, res) => {
+  try {
+    await initializeCloudinary();
+    res.send("Server is live");
+  } catch (error) {
+    console.error('Error initializing server:', error);
+    res.status(500).send("Server initialization failed");
+  }
 });
 
 // Test endpoint to verify server is working
-app.get('/api/test', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Server is working!', 
-    timestamp: new Date().toISOString(),
-    routes: ['/api/ai/*', '/api/user/*'],
-    status: 'healthy'
-  });
+app.get('/api/test', async (req, res) => {
+  try {
+    await initializeCloudinary();
+    res.json({ 
+      success: true, 
+      message: 'Server is working!', 
+      timestamp: new Date().toISOString(),
+      routes: ['/api/ai/*', '/api/user/*'],
+      status: 'healthy'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server initialization failed' });
+  }
 });
 
 // Simple health check
@@ -174,35 +192,23 @@ app.use((error, req, res, next) => {
   res.status(500).json({ success: false, message: error.message || 'Internal server error' });
 });
 
-const PORT = process.env.PORT || 3000;
+// For Vercel serverless deployment, export the app instead of listening
+export default app;
 
-console.log('🚀 Starting server...');
-console.log('🔧 Environment:', process.env.NODE_ENV || 'development');
-console.log('🌐 Port:', PORT);
-console.log('🔑 API Base URL:', process.env.CLIENT_URL || 'http://localhost:5173');
-
-app.listen(PORT, () => {
-  console.log(`✅ Server is running at http://localhost:${PORT}`);
-  console.log(`📁 AI routes mounted at /api/ai`);
-  console.log(`👤 User routes mounted at /api/user`);
-  console.log(`🔐 Authentication required for /api/ai routes`);
-  console.log('🎯 Ready to handle requests!');
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
   
-  // Log routes after server is fully initialized
-  setTimeout(() => {
-    console.log('🔍 Logging routes after server initialization...');
-    try {
-      if (app._router && app._router.stack) {
-        app._router.stack.forEach((middleware) => {
-          if (middleware.route) {
-            console.log(`📍 Route: ${middleware.route.stack[0].method.toUpperCase()} ${middleware.route.path}`);
-          } else if (middleware.name === 'router') {
-            console.log(`📍 Router: ${middleware.regexp}`);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error logging routes after initialization:', error.message);
-    }
-  }, 1000);
-});
+  console.log('🚀 Starting server...');
+  console.log('🔧 Environment:', process.env.NODE_ENV || 'development');
+  console.log('🌐 Port:', PORT);
+  console.log('🔑 API Base URL:', process.env.CLIENT_URL || 'http://localhost:5173');
+
+  app.listen(PORT, () => {
+    console.log(`✅ Server is running at http://localhost:${PORT}`);
+    console.log(`📁 AI routes mounted at /api/ai`);
+    console.log(`👤 User routes mounted at /api/user`);
+    console.log(`🔐 Authentication required for /api/ai routes`);
+    console.log('🎯 Ready to handle requests!');
+  });
+}

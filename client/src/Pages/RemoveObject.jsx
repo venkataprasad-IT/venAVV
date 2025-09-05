@@ -22,43 +22,83 @@ const RemoveObject = () => {
     try {
       setLoading(true);
 
+      // Validate inputs
+      if (!input) {
+        toast.error('Please select an image file');
+        setLoading(false);
+        return;
+      }
+
+      if (!object.trim()) {
+        toast.error('Please enter an object name to remove');
+        setLoading(false);
+        return;
+      }
+
       if (object.split(' ').length > 1) {
         toast.error('Please enter only a single object name');
         setLoading(false);
         return;
       }
 
+      // Validate file type
+      if (!input.type.startsWith('image/')) {
+        toast.error('Please select a valid image file');
+        setLoading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('image', input);
-      formData.append('object', object);
+      formData.append('object', object.trim());
 
       const token = await getToken();
 
       const fullUrl = `${API_BASE_URL}/api/ai/remove-image-object`;
+      console.log('Making request to:', fullUrl);
+      console.log('FormData contents:', { image: input.name, object: object.trim() });
+
       const { data } = await axios.post(fullUrl, formData, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 60000 // Increase timeout for image processing
       });
 
+      console.log('Response received:', data);
+
       if (data.success) {
-        setContent(data.content);
+        setContent(data.content || data.data);
+        toast.success('Object removed successfully!');
       } else {
-        toast.error(data.message);
+        toast.error(data.message || 'Failed to remove object');
       }
     } catch (error) {
+      console.error('Remove object error:', error);
       let errorMessage = 'Failed to remove object from image';
+      
       if (error.response) {
+        console.error('Error response:', error.response.data);
         if (error.response.status === 404) {
-          errorMessage = `Server not found (404). Tried: ${API_BASE_URL}/api/ai/remove-image-object`;
+          errorMessage = `Server endpoint not found. Tried: ${API_BASE_URL}/api/ai/remove-image-object`;
         } else if (error.response.status === 401) {
           errorMessage = 'Authentication failed. Please sign in again.';
         } else if (error.response.status === 400) {
           errorMessage = error.response.data?.message || 'Bad request. Check the image and object name.';
+        } else if (error.response.status === 413) {
+          errorMessage = 'Image file is too large. Please use a smaller image.';
+        } else if (error.response.status === 500) {
+          errorMessage = 'Server error occurred. Please try again later.';
         } else {
-          errorMessage = error.response.data?.message || 'Server error occurred.';
+          errorMessage = error.response.data?.message || `Server error (${error.response.status})`;
         }
       } else if (error.request) {
-        errorMessage = `Network error. Ensure server is running at ${API_BASE_URL}.`;
+        errorMessage = `Network error. Ensure server is running at ${API_BASE_URL}`;
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. The image processing is taking too long.';
       }
+      
       toast.error(errorMessage);
     } finally {
       setLoading(false);

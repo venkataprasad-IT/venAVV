@@ -71,10 +71,10 @@ aiRouter.post(
 
 aiRouter.post(
   "/remove-image-object",
-  auth,
   uploadImage.single("image"),
   (error, req, res, next) => {
     if (error) {
+      console.error('Multer error in remove-image-object:', error);
       if (error.name === 'MulterError') {
         if (error.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({ success: false, message: 'Image too large. Maximum size is 10MB.' });
@@ -85,6 +85,7 @@ aiRouter.post(
     }
     next();
   },
+  auth,
   removeImageObject
 );
 
