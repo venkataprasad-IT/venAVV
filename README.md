@@ -1,4 +1,6 @@
 # 🚀 **AI SaaS Platform** — *Powered by PERN, NeoN Database & AI APIs*  
+🎥 **Project Video Explanation:**  
+[![YouTube Video](https://img.shields.io/badge/Watch%20Video-Click%20Here-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/watch?v=4qvrdjgEbrU)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-QuickAI-blue?style=for-the-badge&logo=vercel)](https://quickai-gs.vercel.app/)
 
 ---
@@ -33,5 +35,6 @@ We’ve built a **fully functional AI SaaS application** using the **PERN stack*
 ---
 
 ## 🌐 **Live Deployment**
+
 > 🎉 **Check out the live app here:**  
-🔗 **[https://quickai-gs.vercel.app/](https://quickai-gs.vercel.app/)**  
+🔗 **[https://quickai-gs.vercel.app/](https://quickai-gs.vercel.app/)**
